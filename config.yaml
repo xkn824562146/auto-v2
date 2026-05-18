@@ -1,0 +1,25 @@
+ai:
+  base_url: "model_url"
+  api_key: "model_api_key"
+  model: "model_name"
+
+extraction:
+  dpi: 300
+  fuzzy_threshold: 60
+  null_handling: "skip"
+
+# 相似检索词库：key 为 Word 模板中的检测项名称，value 为 PDF 中可能出现的别名列表
+# 匹配时会将别名映射回原始字段名
+aliases:
+  内焰尖高度:
+    - 焰尖高度是否达到150mm刻度线
+    - 焰尖高度
+  压缩强度:
+    - 压缩性能
+  火焰横向蔓延:
+    - 横向火焰传播（LFS）至边缘
+  # 示例：
+  # 导热系数:
+  #   - λ值
+  #   - 热导率
+  #   - 导热系数（干态）
