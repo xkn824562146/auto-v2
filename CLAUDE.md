@@ -34,7 +34,7 @@ WordScanner → VisionExtractor → (inline mapping in app.py) → ReportFiller
 - `/convert_doc` (POST) — `.doc` → `.docx` via Windows COM (`win32com`); Windows-only
 - `/upload` (POST) — Scans Word template, calls AI extraction, returns fields for user confirmation
 - `/confirm` (POST) — User confirms values, executes fill, returns download URL
-- `/download/<job_id>` (GET) — Downloads generated `.docx`
+- `/download/<job_id>` (GET) — Downloads generated `.docx`, then auto-deletes the job directory via `@after_this_request`
 - `/pdf_image/<job_id>/<page>` / `/pdf_pages/<job_id>` — PDF preview endpoints
 
 Uploads stored in `uploads/<job_id>/`.
@@ -53,6 +53,11 @@ Uploads stored in `uploads/<job_id>/`.
 - `extraction.fuzzy_threshold` — Fuzzy match threshold (default 60)
 - `aliases` — Field name aliases for AI extraction (key = Word label, value = list of PDF aliases). Example: `内焰尖高度: [焰尖高度是否达到150mm刻度线, 焰尖高度]`
 - `extraction.null_handling` — Defined but unused in code
+- `storage.ttl_hours` — TTL for auto-cleanup of stale job directories (default 24)
+
+**Storage cleanup** (`app.py`): Two mechanisms prevent `uploads/` from growing unbounded:
+1. After `/download/<job_id>` serves the file, `@after_this_request` deletes the entire `uploads/<job_id>/` directory.
+2. On startup, `_cleanup_stale_jobs()` scans `uploads/` and deletes any directory older than `storage.ttl_hours` (default 24). This catches abandoned uploads and any failed post-download cleanup.
 
 ## Key Dependencies
 

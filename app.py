@@ -3,9 +3,11 @@
 import logging
 import os
 import re
+import shutil
+import time
 import uuid
 import yaml
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, send_file, jsonify, after_this_request
 
 from core.log_config import setup_logging
 
@@ -27,6 +29,30 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     CONFIG = yaml.safe_load(f)
+
+
+def _cleanup_stale_jobs():
+    """启动时删除超过 TTL 的历史任务目录。"""
+    ttl_hours = (CONFIG.get("storage") or {}).get("ttl_hours", 24)
+    cutoff = time.time() - ttl_hours * 3600
+    removed = 0
+    if not os.path.isdir(UPLOAD_DIR):
+        return
+    for name in os.listdir(UPLOAD_DIR):
+        job_dir = os.path.join(UPLOAD_DIR, name)
+        if not os.path.isdir(job_dir):
+            continue
+        try:
+            if os.path.getmtime(job_dir) < cutoff:
+                shutil.rmtree(job_dir)
+                removed += 1
+        except OSError as e:
+            logger.warning("清理过期任务目录失败 %s: %s", name, e)
+    if removed:
+        logger.info("启动清理：删除了 %d 个过期任务目录（TTL=%dh）", removed, ttl_hours)
+
+
+_cleanup_stale_jobs()
 
 
 def _parse_standard(label: str):
@@ -327,10 +353,21 @@ def confirm():
 
 @app.route("/download/<job_id>")
 def download(job_id):
-    """下载生成的 Word 文件。"""
+    """下载生成的 Word 文件，下载完成后自动清理任务目录。"""
     output_path = os.path.join(UPLOAD_DIR, job_id, "完成版_检测报告.docx")
     if not os.path.exists(output_path):
         return jsonify({"error": "文件不存在"}), 404
+
+    @after_this_request
+    def _schedule_cleanup(response):
+        job_dir = os.path.join(UPLOAD_DIR, job_id)
+        try:
+            shutil.rmtree(job_dir)
+            logger.info("已清理任务目录: %s", job_id)
+        except OSError as e:
+            logger.warning("清理任务目录失败 %s: %s", job_id, e)
+        return response
+
     return send_file(output_path, as_attachment=True, download_name="完成版_检测报告.docx")
 
 

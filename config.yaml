@@ -23,3 +23,6 @@ aliases:
   #   - λ值
   #   - 热导率
   #   - 导热系数（干态）
+
+storage:
+  ttl_hours: 24
